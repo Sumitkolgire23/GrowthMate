@@ -52,6 +52,7 @@ export interface Database {
           level: number
           name: string | null
           xp: number
+          stat_points: number
         }
         Insert: {
           avatar?: string | null
@@ -63,6 +64,7 @@ export interface Database {
           level?: number
           name?: string | null
           xp?: number
+          stat_points?: number
         }
         Update: {
           avatar?: string | null
@@ -74,6 +76,7 @@ export interface Database {
           level?: number
           name?: string | null
           xp?: number
+          stat_points?: number
         }
         Relationships: [
           {
@@ -99,6 +102,8 @@ export interface Database {
           stats_affected: string[]
           title: string
           xp_reward: number
+          effort_level: string | null
+          completion_notes: string | null
         }
         Insert: {
           category: string
@@ -113,6 +118,8 @@ export interface Database {
           stats_affected: string[]
           title: string
           xp_reward: number
+          effort_level?: string | null
+          completion_notes?: string | null
         }
         Update: {
           category?: string
@@ -127,6 +134,8 @@ export interface Database {
           stats_affected?: string[]
           title?: string
           xp_reward?: number
+          effort_level?: string | null
+          completion_notes?: string | null
         }
         Relationships: [
           {
@@ -174,6 +183,105 @@ export interface Database {
             foreignKeyName: "stats_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      unlocked_skills: {
+        Row: {
+          id: string
+          profile_id: string
+          skill_name: string
+          progress: number
+          unlocked_at: string
+        }
+        Insert: {
+          id?: string
+          profile_id: string
+          skill_name: string
+          progress?: number
+          unlocked_at?: string
+        }
+        Update: {
+          id?: string
+          profile_id?: string
+          skill_name?: string
+          progress?: number
+          unlocked_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "unlocked_skills_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      user_achievements: {
+        Row: {
+          id: string
+          profile_id: string
+          achievement_id: string
+          unlocked_at: string
+        }
+        Insert: {
+          id?: string
+          profile_id: string
+          achievement_id: string
+          unlocked_at?: string
+        }
+        Update: {
+          id?: string
+          profile_id?: string
+          achievement_id?: string
+          unlocked_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_achievements_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      purchased_rewards: {
+        Row: {
+          id: string
+          profile_id: string
+          item_id: string
+          item_name: string
+          item_category: string
+          cost: number
+          purchased_at: string
+        }
+        Insert: {
+          id?: string
+          profile_id: string
+          item_id: string
+          item_name: string
+          item_category: string
+          cost: number
+          purchased_at?: string
+        }
+        Update: {
+          id?: string
+          profile_id?: string
+          item_id?: string
+          item_name?: string
+          item_category?: string
+          cost?: number
+          purchased_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchased_rewards_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           }

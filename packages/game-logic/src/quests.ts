@@ -66,53 +66,48 @@ export interface AchievementDefinition {
   icon: string;
   requirement: number;
   type: 'quests' | 'streak' | 'level' | 'projects';
+  gold_reward: number;
+  xp_reward: number;
 }
 
 export const achievementDefinitions: AchievementDefinition[] = [
-  { id: "first_steps", title: "First Steps", description: "Complete your first quest", icon: "🎯", requirement: 1, type: "quests" },
-  { id: "week_warrior", title: "Week Warrior", description: "Maintain a 7-day learning streak", icon: "🔥", requirement: 7, type: "streak" },
-  { id: "code_ninja", title: "Code Ninja", description: "Maintain a 30-day learning streak", icon: "⚡", requirement: 30, type: "streak" },
-  { id: "quest_master", title: "Quest Master", description: "Complete 50 quests", icon: "👑", requirement: 50, type: "quests" },
-  { id: "level_10", title: "Rising Star", description: "Reach Level 10", icon: "⭐", requirement: 10, type: "level" },
-  { id: "level_50", title: "Seasoned Professional", description: "Reach Level 50", icon: "💫", requirement: 50, type: "level" },
-  { id: "level_100", title: "Elite Status", description: "Reach Level 100 (Staff Engineer)", icon: "👑", requirement: 100, type: "level" },
-  { id: "project_builder", title: "Project Builder", description: "Complete 5 project-based quests", icon: "🏗️", requirement: 5, type: "projects" }
+  { id: "first_steps", title: "First Steps", description: "Complete your first quest", icon: "🎯", requirement: 1, type: "quests", gold_reward: 50, xp_reward: 100 },
+  { id: "week_warrior", title: "Week Warrior", description: "Maintain a 7-day learning streak", icon: "🔥", requirement: 7, type: "streak", gold_reward: 100, xp_reward: 200 },
+  { id: "code_ninja", title: "Code Ninja", description: "Maintain a 30-day learning streak", icon: "⚡", requirement: 30, type: "streak", gold_reward: 500, xp_reward: 1000 },
+  { id: "quest_master", title: "Quest Master", description: "Complete 50 quests", icon: "👑", requirement: 50, type: "quests", gold_reward: 300, xp_reward: 600 },
+  { id: "level_10", title: "Rising Star", description: "Reach Level 10", icon: "⭐", requirement: 10, type: "level", gold_reward: 150, xp_reward: 300 },
+  { id: "level_50", title: "Seasoned Professional", description: "Reach Level 50", icon: "💫", requirement: 50, type: "level", gold_reward: 500, xp_reward: 1000 },
+  { id: "level_100", title: "Elite Status", description: "Reach Level 100 (Staff Engineer)", icon: "👑", requirement: 100, type: "level", gold_reward: 1000, xp_reward: 2000 },
+  { id: "project_builder", title: "Project Builder", description: "Complete 5 project-based quests", icon: "🏗️", requirement: 5, type: "projects", gold_reward: 200, xp_reward: 400 }
 ];
 
-// ===== GROWTH MARKETPLACE ITEMS =====
-export interface MarketplaceItem {
-  id: string;
-  name: string;
-  description: string;
-  cost: number;
-  icon: string;
+export function getNewlyUnlockedAchievements(
+  unlockedIds: string[],
+  metrics: {
+    questsCompleted: number;
+    currentStreak: number;
+    level: number;
+    projectsCompleted: number;
+  }
+): AchievementDefinition[] {
+  return achievementDefinitions.filter(ach => {
+    if (unlockedIds.includes(ach.id)) return false;
+
+    switch (ach.type) {
+      case 'quests':
+        return metrics.questsCompleted >= ach.requirement;
+      case 'streak':
+        return metrics.currentStreak >= ach.requirement;
+      case 'level':
+        return metrics.level >= ach.requirement;
+      case 'projects':
+        return metrics.projectsCompleted >= ach.requirement;
+      default:
+        return false;
+    }
+  });
 }
 
-export const marketplaceItems: Record<'learningCredits' | 'wellnessRewards' | 'careerDevelopment' | 'teamSocial', MarketplaceItem[]> = {
-  learningCredits: [
-    { id: "course_access", name: "Online Course Access", description: "Access to premium Udemy or Coursera course", cost: 500, icon: "🎓" },
-    { id: "certification", name: "Certification Voucher", description: "AWS, Azure, or Google Cloud certification exam", cost: 1500, icon: "📜" },
-    { id: "tech_book", name: "Technical Book", description: "O'Reilly or Manning technical book of choice", cost: 300, icon: "📚" },
-    { id: "conference", name: "Conference Ticket", description: "Virtual tech conference access", cost: 2000, icon: "🎫" }
-  ],
-  wellnessRewards: [
-    { id: "flexible_day", name: "Flexible Work Day", description: "Take a flexible day off for rest", cost: 400, icon: "🏖️" },
-    { id: "extended_break", name: "Extended Break", description: "2-hour extended break allowance", cost: 100, icon: "☕" },
-    { id: "fitness_sub", name: "Fitness Subscription", description: "Monthly fitness class subscription", cost: 600, icon: "🏃" },
-    { id: "mental_health", name: "Mental Health Session", description: "Professional counseling session", cost: 800, icon: "🧘" }
-  ],
-  careerDevelopment: [
-    { id: "resume_review", name: "Resume Review", description: "Professional resume review service", cost: 500, icon: "📄" },
-    { id: "mock_interview", name: "Mock Interview", description: "Technical mock interview session", cost: 700, icon: "💼" },
-    { id: "career_coaching", name: "Career Coaching", description: "1-hour career coaching consultation", cost: 1000, icon: "🎯" },
-    { id: "linkedin_premium", name: "LinkedIn Premium", description: "1-month LinkedIn Premium access", cost: 300, icon: "💼" }
-  ],
-  teamSocial: [
-    { id: "team_lunch", name: "Team Lunch Budget", description: "Budget for team lunch or social event", cost: 400, icon: "🍽️" },
-    { id: "coffee_chat", name: "Coffee Chat Credit", description: "Buy a colleague coffee for networking", cost: 50, icon: "☕" },
-    { id: "peer_recognition", name: "Peer Recognition Award", description: "Send appreciation award to peer", cost: 200, icon: "🏆" }
-  ]
-};
 
 // ===== SKILL TREE STRUCTURE =====
 export interface SkillTreeNode {
@@ -298,4 +293,28 @@ export function generateChallengeQuests(level: number): Omit<Quest, 'id' | 'comp
     }
   }
   return quests;
+}
+
+export function findSkillByName(name: string): SkillTreeNode | null {
+  for (const path in skillTreeData) {
+    const domain = (skillTreeData as any)[path];
+    for (const tier in domain) {
+      const skills = domain[tier] as SkillTreeNode[];
+      const skill = skills.find(s => s.name === name);
+      if (skill) return skill;
+    }
+  }
+  return null;
+}
+
+export function getSkillTier(name: string): 'beginner' | 'intermediate' | 'advanced' | null {
+  if (skillTreeData.web_development.beginner.some(s => s.name === name)) return 'beginner';
+  if (skillTreeData.web_development.intermediate.some(s => s.name === name)) return 'intermediate';
+  if (skillTreeData.web_development.advanced.some(s => s.name === name)) return 'advanced';
+
+  if (skillTreeData.ai_ml.beginner.some(s => s.name === name)) return 'beginner';
+  if (skillTreeData.ai_ml.intermediate.some(s => s.name === name)) return 'intermediate';
+  if (skillTreeData.ai_ml.advanced.some(s => s.name === name)) return 'advanced';
+
+  return null;
 }

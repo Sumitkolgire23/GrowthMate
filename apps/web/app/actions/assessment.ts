@@ -71,6 +71,32 @@ export async function initializeCharacter(assessmentData: AssessmentData) {
       return { success: false, error: `Failed to save stats: ${statsError.message}` };
     }
 
+    // 6. Insert default Beginner skills into unlocked_skills
+    const defaultBeginnerSkills = [
+      "HTML Fundamentals",
+      "CSS Basics",
+      "JavaScript Essentials",
+      "Git Version Control",
+      "Python Programming",
+      "Math Foundations",
+      "Statistics Basics",
+      "Data Visualization"
+    ];
+
+    const skillsToInsert = defaultBeginnerSkills.map(name => ({
+      profile_id: user.id,
+      skill_name: name,
+      progress: 0
+    }));
+
+    const { error: defaultSkillsError } = await supabase
+      .from('unlocked_skills')
+      .insert(skillsToInsert);
+
+    if (defaultSkillsError) {
+      return { success: false, error: `Failed to save default skills: ${defaultSkillsError.message}` };
+    }
+
     return { success: true, stats: computedStats };
   } catch (error: any) {
     return { success: false, error: error.message || 'An unexpected error occurred.' };

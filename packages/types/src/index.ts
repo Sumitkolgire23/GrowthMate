@@ -56,4 +56,17 @@ export interface Quest {
   completed: boolean;
   completed_at?: string;
   created_at?: string;
+  effort_level?: 'low' | 'medium' | 'high' | 'extreme';
+  completion_notes?: string;
+}
+
+export interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  requirement: number;
+  type: 'quests' | 'streak' | 'level' | 'projects';
+  gold_reward: number;
+  xp_reward: number;
 }
