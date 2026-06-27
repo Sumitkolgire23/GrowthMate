@@ -1,14 +1,13 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { createClient } from '../../../lib/supabase/client'
 import { useQuery } from '@tanstack/react-query'
 import {
   MARKETPLACE_ITEMS,
   MarketplaceCategory,
   MarketplaceItem,
 } from '@repo/game-logic/marketplace'
-import { purchaseRewardItem } from '../../actions/marketplace'
+import { purchaseRewardItem, getMarketplaceData } from '../../actions/marketplace'
 
 const CATEGORIES: { key: MarketplaceCategory; label: string; icon: string; color: string }[] = [
   { key: 'learning', label: 'Learning Credits', icon: '🎓', color: '#06b6d4' },
@@ -18,43 +17,24 @@ const CATEGORIES: { key: MarketplaceCategory; label: string; icon: string; color
 ]
 
 export default function MarketplacePage() {
-  const supabase = createClient()
   const [activeCategory, setActiveCategory] = useState<MarketplaceCategory>('learning')
   const [isPending, startTransition] = useTransition()
   const [purchasedItemId, setPurchasedItemId] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [redemptionModal, setRedemptionModal] = useState<MarketplaceItem | null>(null)
 
-  // Fetch profile (gold balance)
-  const { data: profile, refetch: refetchProfile } = useQuery<any>({
-    queryKey: ['profile-gold'],
+  // Fetch marketplace data (gold balance and history) in one request
+  const { data: marketplaceData, refetch } = useQuery<any>({
+    queryKey: ['marketplace_data'],
     queryFn: async () => {
-      const { data: { user } } = await (supabase as any).auth.getUser()
-      if (!user) return null
-      const { data } = await (supabase as any)
-        .from('profiles')
-        .select('gold, username, rank_title')
-        .eq('id', user.id)
-        .single()
-      return data
-    },
-  })
+      const data = await getMarketplaceData();
+      if (!data) throw new Error('Failed to load marketplace data');
+      return data;
+    }
+  });
 
-  // Fetch purchase history
-  const { data: history, refetch: refetchHistory } = useQuery<any[]>({
-    queryKey: ['purchase-history'],
-    queryFn: async () => {
-      const { data: { user } } = await (supabase as any).auth.getUser()
-      if (!user) return []
-      const { data } = await (supabase as any)
-        .from('purchased_rewards')
-        .select('*')
-        .eq('profile_id', user.id)
-        .order('purchased_at', { ascending: false })
-        .limit(20)
-      return data || []
-    },
-  })
+  const profile = marketplaceData?.profile;
+  const history = marketplaceData?.history || [];
 
   const filteredItems = MARKETPLACE_ITEMS.filter(i => i.category === activeCategory)
   const gold = profile?.gold ?? 0
@@ -67,8 +47,7 @@ export default function MarketplacePage() {
       if (result.success) {
         setFeedback({ type: 'success', message: result.message })
         setRedemptionModal(item)
-        refetchProfile()
-        refetchHistory()
+        refetch()
       } else {
         setFeedback({ type: 'error', message: result.message })
       }

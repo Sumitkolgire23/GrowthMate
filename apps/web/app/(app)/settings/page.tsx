@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '../../../lib/supabase/client';
+import { getCurrentUser } from '../../actions/auth';
 import { resetCharacter } from '../../actions/stats';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
@@ -18,7 +18,6 @@ import {
 export default function SettingsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const supabase = createClient();
   
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -30,11 +29,9 @@ export default function SettingsPage() {
   const { data: profile } = useQuery<any>({
     queryKey: ['profile'],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getCurrentUser();
       if (!user) throw new Error('Unauthenticated');
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-      if (error) throw error;
-      return data;
+      return user;
     }
   });
 

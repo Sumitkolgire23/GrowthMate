@@ -8,8 +8,12 @@
     ".": "./src/index.ts",
     "./*": "./src/*.ts"
   },
+  "dependencies": {
+    "@prisma/client": "^5.10.2"
+  },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
+    "prisma": "^5.10.2",
     "typescript": "^5.9.2"
   }
 }

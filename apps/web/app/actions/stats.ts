@@ -1,32 +1,22 @@
 'use server';
 
-import { createClient } from '../../lib/supabase/server';
-import { Database } from '@repo/database';
-import { SupabaseClient } from '@supabase/supabase-js';
+import { prisma } from '@repo/database';
 import { CharacterStats } from '@repo/types';
+import { getCurrentUser } from './auth';
 
 export async function allocateStatPoints(allocation: Partial<CharacterStats>) {
   try {
-    const supabase = (await createClient()) as unknown as SupabaseClient<Database>;
-
-    // 1. Get authenticated user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const user = await getCurrentUser();
+    if (!user) {
       return { success: false, error: 'User is not authenticated.' };
     }
 
     // 2. Fetch current profile to check available stat points
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
+    const profile = await prisma.profile.findUnique({
+      where: { id: user.id },
+    });
 
-    if (profileError || !profile) {
+    if (!profile) {
       return { success: false, error: 'Profile not found.' };
     }
 
@@ -37,18 +27,16 @@ export async function allocateStatPoints(allocation: Partial<CharacterStats>) {
       return { success: false, error: 'No points allocated.' };
     }
 
-    if (totalAllocated > profile.stat_points) {
+    if (totalAllocated > profile.statPoints) {
       return { success: false, error: 'Not enough available stat points.' };
     }
 
     // 3. Fetch current stats
-    const { data: stats, error: statsError } = await supabase
-      .from('stats')
-      .select('*')
-      .eq('profile_id', user.id)
-      .single();
+    const stats = await prisma.stats.findUnique({
+      where: { profileId: user.id },
+    });
 
-    if (statsError || !stats) {
+    if (!stats) {
       return { success: false, error: 'Stats not found.' };
     }
 
@@ -62,27 +50,22 @@ export async function allocateStatPoints(allocation: Partial<CharacterStats>) {
       resilience: Math.min(100, stats.resilience + (allocation.resilience || 0)),
     };
 
-    // 5. Update stats table
-    const { error: statsUpdateError } = await supabase
-      .from('stats')
-      .update(updatedStats)
-      .eq('profile_id', user.id);
+    // 5. Update database inside transaction
+    await prisma.$transaction(async (tx) => {
+      // Update stats table
+      await tx.stats.update({
+        where: { profileId: user.id },
+        data: updatedStats,
+      });
 
-    if (statsUpdateError) {
-      return { success: false, error: 'Failed to update stats.' };
-    }
-
-    // 6. Update profile to deduct spent points
-    const { error: profileUpdateError } = await supabase
-      .from('profiles')
-      .update({
-        stat_points: profile.stat_points - totalAllocated,
-      })
-      .eq('id', user.id);
-
-    if (profileUpdateError) {
-      return { success: false, error: 'Failed to update profile points.' };
-    }
+      // Update profile to deduct spent points
+      await tx.profile.update({
+        where: { id: user.id },
+        data: {
+          statPoints: profile.statPoints - totalAllocated,
+        },
+      });
+    });
 
     return { success: true };
   } catch (error: any) {
@@ -92,45 +75,89 @@ export async function allocateStatPoints(allocation: Partial<CharacterStats>) {
 
 export async function resetCharacter() {
   try {
-    const supabase = (await createClient()) as unknown as SupabaseClient<Database>;
-
-    // 1. Get authenticated user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const user = await getCurrentUser();
+    if (!user) {
       return { success: false, error: 'User is not authenticated.' };
     }
 
     // 2. Delete all related tables
-    await supabase.from('stats').delete().eq('profile_id', user.id);
-    await supabase.from('quests').delete().eq('profile_id', user.id);
-    await supabase.from('unlocked_skills').delete().eq('profile_id', user.id);
-    await supabase.from('user_achievements').delete().eq('profile_id', user.id);
-    await supabase.from('assessment_responses').delete().eq('profile_id', user.id);
+    await prisma.$transaction(async (tx) => {
+      await tx.stats.deleteMany({ where: { profileId: user.id } });
+      await tx.quest.deleteMany({ where: { profileId: user.id } });
+      await tx.unlockedSkill.deleteMany({ where: { profileId: user.id } });
+      await tx.userAchievement.deleteMany({ where: { profileId: user.id } });
+      await tx.assessmentResponse.deleteMany({ where: { profileId: user.id } });
+      await tx.purchasedReward.deleteMany({ where: { profileId: user.id } });
 
-    // 3. Reset profile fields
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .update({
-        level: 1,
-        xp: 0,
-        gold: 100,
-        engagement: 50,
-        energy: 70,
-        stat_points: 0,
-        name: user.email?.split('@')[0] || 'Unknown Hunter',
-      })
-      .eq('id', user.id);
+      // 3. Reset profile fields
+      await tx.profile.update({
+        where: { id: user.id },
+        data: {
+          level: 1,
+          xp: 0,
+          gold: 100,
+          engagement: 50,
+          energy: 70,
+          statPoints: 0,
+          name: user.email?.split('@')[0] || 'Unknown Hunter',
+        },
+      });
 
-    if (profileError) {
-      return { success: false, error: `Failed to reset profile: ${profileError.message}` };
-    }
+      // 4. Create base stats record
+      await tx.stats.create({
+        data: {
+          profileId: user.id,
+          productivity: 10,
+          creativity: 10,
+          knowledge: 10,
+          experience: 10,
+          intelligence: 10,
+          resilience: 10,
+        },
+      });
+    });
 
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message || 'An unexpected error occurred.' };
+  }
+}
+
+export async function getProgressData() {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return null;
+
+    const profile = await prisma.profile.findUnique({
+      where: { id: user.id },
+      include: { stats: true },
+    });
+
+    const completedQuests = await prisma.quest.findMany({
+      where: {
+        profileId: user.id,
+        completed: true,
+      },
+      orderBy: { completedAt: 'asc' },
+    });
+
+    const achievements = await prisma.userAchievement.findMany({
+      where: { profileId: user.id },
+    });
+
+    return {
+      profile,
+      stats: profile?.stats || null,
+      completedQuests: completedQuests.map(q => ({
+        ...q,
+        stats_affected: q.statsAffected.split(','),
+        completed_at: q.completedAt ? q.completedAt.toISOString() : null,
+        xp_reward: q.xpReward,
+        gold_reward: q.goldReward,
+      })),
+      achievements,
+    };
+  } catch (err) {
+    return null;
   }
 }

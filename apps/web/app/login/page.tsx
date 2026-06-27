@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { createClient } from '../../lib/supabase/client';
+import { loginUser } from '../actions/auth';
 import { Shield, Lock, Mail, ChevronRight, Activity } from 'lucide-react';
 
 export default function LoginPage() {
@@ -19,14 +19,10 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const supabase = createClient();
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const result = await loginUser(email, password);
 
-      if (signInError) {
-        setError(signInError.message);
+      if (!result.success) {
+        setError(result.error || 'Login failed.');
       } else {
         router.push('/dashboard');
         router.refresh();
@@ -131,7 +127,7 @@ export default function LoginPage() {
       </div>
 
       <div className="mt-8 text-center text-[10px] text-slate-600 uppercase tracking-widest relative z-10">
-        Secured by Supabase Cryptography • v1.0.0
+        Secured by Custom Cryptographic Session • v1.0.0
       </div>
     </div>
   );

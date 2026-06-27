@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { createClient } from '../../lib/supabase/client';
+import { signUpUser } from '../actions/auth';
 import { Shield, Lock, Mail, User, ChevronRight, Activity } from 'lucide-react';
 
 export default function SignupPage() {
@@ -21,19 +21,10 @@ export default function SignupPage() {
     setError(null);
 
     try {
-      const supabase = createClient();
-      const { error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name,
-          },
-        },
-      });
+      const result = await signUpUser(email, password, name);
 
-      if (signUpError) {
-        setError(signUpError.message);
+      if (!result.success) {
+        setError(result.error || 'Registration failed.');
       } else {
         setSuccess(true);
         // Wait a bit, then redirect
@@ -167,7 +158,7 @@ export default function SignupPage() {
       </div>
 
       <div className="mt-8 text-center text-[10px] text-slate-600 uppercase tracking-widest relative z-10">
-        Secured by Supabase Cryptography • v1.0.0
+        Secured by Custom Cryptographic Session • v1.0.0
       </div>
     </div>
   );

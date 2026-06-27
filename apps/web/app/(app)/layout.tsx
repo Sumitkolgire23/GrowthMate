@@ -3,7 +3,7 @@
 import React from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { createClient } from '../../lib/supabase/client';
+import { getCurrentUser, logoutUser } from '../actions/auth';
 import { useQuery } from '@tanstack/react-query';
 import { 
   getRankingInfo, 
@@ -25,27 +25,19 @@ import {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const supabase = createClient();
 
-  // Fetch user profile
+  // Fetch user profile from custom auth
   const { data: profile, isLoading } = useQuery<any>({
     queryKey: ['profile'],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getCurrentUser();
       if (!user) throw new Error('Unauthenticated');
-      
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-      if (error) throw error;
-      return data;
+      return user;
     }
   });
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await logoutUser();
     router.push('/login');
     router.refresh();
   };

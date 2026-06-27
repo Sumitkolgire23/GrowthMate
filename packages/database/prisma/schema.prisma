@@ -1,0 +1,108 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+  profile      Profile?
+}
+
+model Profile {
+  id                  String               @id
+  user                User                 @relation(fields: [id], references: [id], onDelete: Cascade)
+  name                String?
+  avatar              String?
+  level               Int                  @default(1)
+  xp                  Int                  @default(0)
+  gold                Int                  @default(100)
+  engagement          Int                  @default(50)
+  energy              Int                  @default(70)
+  statPoints          Int                  @default(0)
+  createdAt           DateTime             @default(now())
+  stats               Stats?
+  quests              Quest[]
+  assessmentResponses AssessmentResponse[]
+  unlockedSkills      UnlockedSkill[]
+  achievements        UserAchievement[]
+  purchasedRewards    PurchasedReward[]
+}
+
+model Stats {
+  profileId    String   @id
+  profile      Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  productivity Int      @default(10)
+  creativity   Int      @default(10)
+  knowledge    Int      @default(10)
+  experience   Int      @default(10)
+  intelligence Int      @default(10)
+  resilience   Int      @default(10)
+  updatedAt    DateTime @default(now()) @updatedAt
+}
+
+model Quest {
+  id              String    @id @default(uuid())
+  profileId       String
+  profile         Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  title           String
+  description     String
+  category        String // daily | weekly | monthly | challenge | recommendation
+  rank            String // F | E | D | C | B | A | S
+  xpReward        Int
+  goldReward      Int
+  statsAffected   String // Comma-separated stats affected (e.g. "productivity,resilience")
+  completed       Boolean   @default(false)
+  completedAt     DateTime?
+  effortLevel     String?   @default("medium")
+  completionNotes String?
+  createdAt       DateTime  @default(now())
+}
+
+model AssessmentResponse {
+  id            String   @id @default(uuid())
+  profileId     String
+  profile       Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  rawAnswers    String // JSON stringified raw answers
+  computedStats String // JSON stringified computed stats
+  createdAt     DateTime @default(now())
+}
+
+model UnlockedSkill {
+  id         String   @id @default(uuid())
+  profileId  String
+  profile    Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  skillName  String
+  progress   Int      @default(0)
+  unlockedAt DateTime @default(now())
+
+  @@unique([profileId, skillName])
+}
+
+model UserAchievement {
+  id            String   @id @default(uuid())
+  profileId     String
+  profile       Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  achievementId String
+  unlockedAt    DateTime @default(now())
+
+  @@unique([profileId, achievementId])
+}
+
+model PurchasedReward {
+  id           String   @id @default(uuid())
+  profileId    String
+  profile      Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  itemId       String
+  itemName     String
+  itemCategory String
+  cost         Int
+  purchasedAt  DateTime @default(now())
+}

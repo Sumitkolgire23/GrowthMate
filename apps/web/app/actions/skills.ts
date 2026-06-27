@@ -1,25 +1,17 @@
 'use server';
 
-import { createClient } from '../../lib/supabase/server';
-import { Database } from '@repo/database';
-import { SupabaseClient } from '@supabase/supabase-js';
+import { prisma } from '@repo/database';
 import { findSkillByName, getSkillTier } from '@repo/game-logic';
+import { getCurrentUser } from './auth';
 
 export async function unlockSkill(skillName: string) {
   try {
-    const supabase = (await createClient()) as unknown as SupabaseClient<Database>;
-
-    // 1. Get authenticated user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const user = await getCurrentUser();
+    if (!user) {
       return { success: false, error: 'User is not authenticated.' };
     }
 
-    // 2. Fetch skill details
+    // 2. Fetch skill details from local game-logic configuration
     const skillNode = findSkillByName(skillName);
     const tier = getSkillTier(skillName);
 
@@ -33,13 +25,11 @@ export async function unlockSkill(skillName: string) {
     if (tier === 'advanced') cost = 200;
 
     // 3. Fetch profile to check Gold balance
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
+    const profile = await prisma.profile.findUnique({
+      where: { id: user.id },
+    });
 
-    if (profileError || !profile) {
+    if (!profile) {
       return { success: false, error: 'Profile not found.' };
     }
 
@@ -48,57 +38,66 @@ export async function unlockSkill(skillName: string) {
     }
 
     // 4. Fetch already unlocked skills to check prerequisite
-    const { data: unlockedSkills, error: fetchSkillsError } = await supabase
-      .from('unlocked_skills')
-      .select('*')
-      .eq('profile_id', user.id);
-
-    if (fetchSkillsError) {
-      return { success: false, error: 'Failed to fetch unlocked skills.' };
-    }
+    const unlockedSkills = await prisma.unlockedSkill.findMany({
+      where: { profileId: user.id },
+    });
 
     // Check if already unlocked
-    const isAlreadyUnlocked = unlockedSkills?.some(s => s.skill_name === skillName);
+    const isAlreadyUnlocked = unlockedSkills.some(s => s.skillName === skillName);
     if (isAlreadyUnlocked) {
       return { success: false, error: 'Skill is already unlocked.' };
     }
 
     // Check prerequisite
     if (skillNode.prereq) {
-      const isPrereqUnlocked = unlockedSkills?.some(s => s.skill_name === skillNode.prereq);
+      const isPrereqUnlocked = unlockedSkills.some(s => s.skillName === skillNode.prereq);
       if (!isPrereqUnlocked) {
         return { success: false, error: `Prerequisite locked: Requires ${skillNode.prereq}` };
       }
     }
 
     // 5. Perform updates: deduct Gold and insert unlocked skill
-    // Deduct Gold from Profile
-    const { error: profileUpdateError } = await supabase
-      .from('profiles')
-      .update({
-        gold: profile.gold - cost
-      })
-      .eq('id', user.id);
-
-    if (profileUpdateError) {
-      return { success: false, error: 'Failed to deduct Gold.' };
-    }
-
-    // Insert to unlocked_skills
-    const { error: insertSkillError } = await supabase
-      .from('unlocked_skills')
-      .insert({
-        profile_id: user.id,
-        skill_name: skillName,
-        progress: 0
+    await prisma.$transaction(async (tx) => {
+      // Deduct Gold from Profile
+      await tx.profile.update({
+        where: { id: user.id },
+        data: {
+          gold: profile.gold - cost,
+        },
       });
 
-    if (insertSkillError) {
-      return { success: false, error: 'Failed to unlock skill in the database.' };
-    }
+      // Insert to unlocked_skills
+      await tx.unlockedSkill.create({
+        data: {
+          profileId: user.id,
+          skillName,
+          progress: 0,
+        },
+      });
+    });
 
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message || 'An unexpected error occurred.' };
+  }
+}
+
+export async function getUserSkills() {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return [];
+
+    const unlocked = await prisma.unlockedSkill.findMany({
+      where: { profileId: user.id },
+      orderBy: { unlockedAt: 'asc' },
+    });
+
+    return unlocked.map(s => ({
+      ...s,
+      skill_name: s.skillName,
+      unlocked_at: s.unlockedAt.toISOString(),
+    }));
+  } catch (err) {
+    return [];
   }
 }

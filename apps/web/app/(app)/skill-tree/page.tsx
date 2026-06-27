@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { createClient } from '../../../lib/supabase/client';
-import { unlockSkill } from '../../actions/skills';
+import { getCurrentUser } from '../../actions/auth';
+import { unlockSkill, getUserSkills } from '../../actions/skills';
 import { skillTreeData } from '@repo/game-logic';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
@@ -26,7 +26,6 @@ interface SkillNode {
 
 export default function SkillTreePage() {
   const queryClient = useQueryClient();
-  const supabase = createClient();
   
   const [activeTab, setActiveTab] = useState<'web_development' | 'ai_ml'>('web_development');
   const [selectedSkill, setSelectedSkill] = useState<SkillNode | null>(null);
@@ -37,11 +36,9 @@ export default function SkillTreePage() {
   const { data: profile } = useQuery<any>({
     queryKey: ['profile'],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getCurrentUser();
       if (!user) throw new Error('Unauthenticated');
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-      if (error) throw error;
-      return data;
+      return user;
     }
   });
 
@@ -49,14 +46,7 @@ export default function SkillTreePage() {
   const { data: unlockedSkills = [] } = useQuery<any[]>({
     queryKey: ['unlocked_skills'],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Unauthenticated');
-      const { data, error } = await supabase
-        .from('unlocked_skills')
-        .select('*')
-        .eq('profile_id', user.id);
-      if (error) throw error;
-      return data || [];
+      return getUserSkills();
     }
   });
 

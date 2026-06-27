@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { createClient } from '../../../lib/supabase/client';
-import { completeQuest } from '../../actions/quests';
+import { getCurrentUser } from '../../actions/auth';
+import { generateUserQuests, completeQuest } from '../../actions/quests';
 import { allocateStatPoints } from '../../actions/stats';
 import { 
   getXPForLevel, 
@@ -56,14 +56,12 @@ export default function DashboardContent({
     resilience: 0
   });
 
-  const supabase = createClient();
-
   const { data: profile } = useQuery({
     queryKey: ['profile'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', initialProfile.id).single();
-      if (error) throw error;
-      return data;
+      const user = await getCurrentUser();
+      if (!user) throw new Error('Unauthenticated');
+      return user;
     },
     initialData: initialProfile
   });
@@ -71,9 +69,9 @@ export default function DashboardContent({
   const { data: stats } = useQuery({
     queryKey: ['stats'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('stats').select('*').eq('profile_id', initialProfile.id).single();
-      if (error) throw error;
-      return data;
+      const user = await getCurrentUser();
+      if (!user || !user.stats) throw new Error('Stats not found');
+      return user.stats;
     },
     initialData: initialStats
   });
@@ -81,14 +79,9 @@ export default function DashboardContent({
   const { data: quests } = useQuery({
     queryKey: ['quests'],
     queryFn: async () => {
-      const todayStr = new Date().toISOString().split('T')[0];
-      const { data, error } = await supabase
-        .from('quests')
-        .select('*')
-        .eq('profile_id', initialProfile.id)
-        .gte('created_at', `${todayStr}T00:00:00Z`);
-      if (error) throw error;
-      return data || [];
+      const res = await generateUserQuests();
+      if (!res.success) throw new Error(res.error || 'Failed to fetch quests');
+      return res.quests || [];
     },
     initialData: initialQuests
   });
@@ -103,7 +96,7 @@ export default function DashboardContent({
       effortLevel: 'low' | 'medium' | 'high' | 'extreme'; 
       completionNotes?: string; 
     }) => {
-      const result = await completeQuest(questId, effortLevel, completionNotes);
+      const result = (await completeQuest(questId, effortLevel, completionNotes)) as any;
       if (!result.success) {
         throw new Error(result.error || 'Failed to complete quest');
       }
@@ -183,7 +176,7 @@ export default function DashboardContent({
       }
       setError(err.message || 'Failed to complete quest.');
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       if (data.leveledUp) {
         setLevelUpInfo({
           show: true,

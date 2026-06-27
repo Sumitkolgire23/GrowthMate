@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { createClient } from '../../../lib/supabase/client';
+import { getProgressData } from '../../actions/stats';
 import { useQuery } from '@tanstack/react-query';
 import { achievementDefinitions } from '@repo/game-logic';
 import {
@@ -29,63 +29,27 @@ import {
 } from 'lucide-react';
 
 export default function ProgressPage() {
-  const supabase = createClient();
-
-  // 1. Fetch profile
-  const { data: profile } = useQuery<any>({
-    queryKey: ['profile'],
+  const { data: progressData, isLoading } = useQuery<any>({
+    queryKey: ['progress_data'],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Unauthenticated');
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-      if (error) throw error;
+      const data = await getProgressData();
+      if (!data) throw new Error('Failed to load progress data');
       return data;
     }
   });
 
-  // 2. Fetch stats
-  const { data: stats } = useQuery<any>({
-    queryKey: ['stats'],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Unauthenticated');
-      const { data, error } = await supabase.from('stats').select('*').eq('profile_id', user.id).single();
-      if (error) throw error;
-      return data;
-    }
-  });
+  if (isLoading || !progressData) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 rounded-full border-2 border-cyan-500 border-t-transparent animate-spin mx-auto"></div>
+          <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">ANALYZING SYSTEM METRICS...</p>
+        </div>
+      </div>
+    );
+  }
 
-  // 3. Fetch completed quests
-  const { data: completedQuests = [] } = useQuery<any[]>({
-    queryKey: ['completed_quests'],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Unauthenticated');
-      const { data, error } = await supabase
-        .from('quests')
-        .select('*')
-        .eq('profile_id', user.id)
-        .eq('completed', true)
-        .order('completed_at', { ascending: true });
-      if (error) throw error;
-      return data || [];
-    }
-  });
-
-  // 4. Fetch unlocked achievements
-  const { data: userAchievements = [] } = useQuery<any[]>({
-    queryKey: ['user_achievements'],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Unauthenticated');
-      const { data, error } = await supabase
-        .from('user_achievements')
-        .select('*')
-        .eq('profile_id', user.id);
-      if (error) throw error;
-      return data || [];
-    }
-  });
+  const { profile, stats, completedQuests = [], achievements: userAchievements = [] } = progressData;
 
   // Format Radar Data
   const radarData = stats ? [
@@ -102,7 +66,7 @@ export default function ProgressPage() {
     if (completedQuests.length === 0) return [];
     
     const xpByDate: Record<string, number> = {};
-    completedQuests.forEach(q => {
+    completedQuests.forEach((q: any) => {
       if (!q.completed_at) return;
       const dateStr = new Date(q.completed_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
       xpByDate[dateStr] = (xpByDate[dateStr] || 0) + (q.xp_reward || 0);
@@ -118,12 +82,12 @@ export default function ProgressPage() {
 
   // Combine definitions with user unlock status
   const achievements = achievementDefinitions.map(def => {
-    const isUnlocked = userAchievements.some(ua => ua.achievement_id === def.id);
-    const unlockDetail = userAchievements.find(ua => ua.achievement_id === def.id);
+    const isUnlocked = userAchievements.some((ua: any) => ua.achievementId === def.id);
+    const unlockDetail = userAchievements.find((ua: any) => ua.achievementId === def.id);
     return {
       ...def,
       isUnlocked,
-      unlockedAt: unlockDetail ? new Date(unlockDetail.unlocked_at).toLocaleDateString() : null
+      unlockedAt: unlockDetail ? new Date(unlockDetail.unlockedAt).toLocaleDateString() : null
     };
   });
 
