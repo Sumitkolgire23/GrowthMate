@@ -37,7 +37,7 @@
 growthmate/
 ├── .github/workflows/    # CI pipelines (GitHub Actions)
 ├── apps/
-│   └── web/              # Next.js web application (Runs on port 6000)
+│   └── web/              # Next.js web application (Runs on port 3100)
 ├── packages/
 │   ├── game-logic/       # Math utility, leveling curves, and quest generation (pure TS, tested)
 │   ├── database/         # Prisma schema, migrations, and typed Prisma Client singleton
@@ -82,7 +82,7 @@ growthmate/
    ```bash
    pnpm dev
    ```
-   The application will start on **`http://localhost:6000`**.
+   The application will start on **`http://localhost:3100`**.
 
 ---
 
